@@ -10,7 +10,7 @@ namespace Hooks
 		return;
 	}
 	
-	uint64_t injectionPoint, origCodeSize;
+	uint64_t injectionPoint, origCodeSize, enabledControlsOffset;
 	void ScrollWheelFix()
 	{
 		//1.5.97 c11600 67242
@@ -20,6 +20,7 @@ namespace Hooks
 			return;
 		}
 		uintptr_t offset = 0;
+        enabledControlsOffset = 0x118;
 		
 		switch (REL::Module::GetRuntime()) {
 			case REL::Module::Runtime::SE:
@@ -27,6 +28,9 @@ namespace Hooks
 				break;
 			case REL::Module::Runtime::AE:
 				offset = 0x3c8;
+                if (REL::Module::get().version().patch() >= 1130) {
+                    enabledControlsOffset = 0x120;
+                }
 				break;
 			default:
 				fail();
@@ -39,7 +43,7 @@ namespace Hooks
 		{
 			OrigCode()
 			{
-				mov(eax, qword[rax + 0x118]);
+				mov(eax, qword[rax + enabledControlsOffset]);
 			}
 		};
 		OrigCode orig;
@@ -56,7 +60,7 @@ namespace Hooks
 		{
 			DeleteBit6()
 			{
-				mov(eax, qword[rax + 0x118]);
+                mov(eax, qword[rax + enabledControlsOffset]);
 				and_(cl, 0xdf); //delete bit #6
 				jmp(ptr[rip]);
 				dq(injectionPoint + origCodeSize);
@@ -75,7 +79,7 @@ namespace Hooks
 		injectedCode.write_branch<5>(injectionPoint, 
 		                             injectedCode.allocate(db6));
 
-		logger::info("injected Code @ {0:x}", injectionPoint);
+		logger::info("injected Code @ {0:x}; enabledControlsOffset @ {1:x}", injectionPoint, enabledControlsOffset);
 		logger::info("fixed scroll wheel zoom during object animations!");
 		
 	}
